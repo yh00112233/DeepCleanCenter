@@ -1,0 +1,5 @@
+ScanReports/
+Quarantine/
+cleanup_actions.jsonl
+*.bad_*
+*.download
