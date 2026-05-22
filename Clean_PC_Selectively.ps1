@@ -3039,7 +3039,7 @@ function New-GroupSummaryTable {
     }
 
     $table.DefaultView.Sort = "RiskRank DESC, Bytes DESC"
-    return $table
+    return ,$table
 }
 
 function New-ItemTableForGroup {
@@ -3074,7 +3074,7 @@ function New-ItemTableForGroup {
         [void]$table.Rows.Add($newRow)
     }
 
-    return $table
+    return ,$table
 }
 
 function Set-DetailFromRows {
@@ -3163,6 +3163,49 @@ function Set-CleanupGridStyle {
         [System.Windows.Forms.DataGridView]$Grid,
         [string]$Kind
     )
+
+    $Grid.AutoGenerateColumns = $false
+    if ($Grid.Columns.Count -eq 0) {
+        if ($Kind -eq "Group") {
+            $colSelected = New-Object System.Windows.Forms.DataGridViewCheckBoxColumn
+            $colSelected.Name = "Selected"
+            $colSelected.DataPropertyName = "Selected"
+            [void]$Grid.Columns.Add($colSelected)
+
+            foreach ($spec in @(
+                @{ Name = "DisplayGroup"; Property = "DisplayGroup" },
+                @{ Name = "SelectedText"; Property = "SelectedText" },
+                @{ Name = "Count"; Property = "Count" },
+                @{ Name = "Size"; Property = "Size" },
+                @{ Name = "Risk"; Property = "Risk" }
+            )) {
+                $col = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+                $col.Name = $spec.Name
+                $col.DataPropertyName = $spec.Property
+                [void]$Grid.Columns.Add($col)
+            }
+        }
+        else {
+            $colSelected = New-Object System.Windows.Forms.DataGridViewCheckBoxColumn
+            $colSelected.Name = "Selected"
+            $colSelected.DataPropertyName = "Selected"
+            [void]$Grid.Columns.Add($colSelected)
+
+            foreach ($spec in @(
+                @{ Name = "Name"; Property = "Name" },
+                @{ Name = "Category"; Property = "Category" },
+                @{ Name = "Size"; Property = "Size" },
+                @{ Name = "Risk"; Property = "Risk" },
+                @{ Name = "Action"; Property = "Action" },
+                @{ Name = "Note"; Property = "Note" }
+            )) {
+                $col = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+                $col.Name = $spec.Name
+                $col.DataPropertyName = $spec.Property
+                [void]$Grid.Columns.Add($col)
+            }
+        }
+    }
 
     $Grid.AllowUserToAddRows = $false
     $Grid.AllowUserToDeleteRows = $false
@@ -3260,8 +3303,8 @@ function Show-MainWindow {
     $root.Dock = "Fill"
     $root.ColumnCount = 1
     $root.RowCount = 3
-    [void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 86)))
-    [void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 38)))
+    [void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 118)))
+    [void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 42)))
     [void]$root.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
     $form.Controls.Add($root)
 
@@ -3311,9 +3354,9 @@ function Show-MainWindow {
     [void]$top.Controls.Add($chkLarge)
 
     $lblThreshold = New-Object System.Windows.Forms.Label
-    $lblThreshold.Text = "阈值 MB"
+    $lblThreshold.Text = "阈值(MB)"
     $lblThreshold.TextAlign = "MiddleLeft"
-    $lblThreshold.Width = 58
+    $lblThreshold.Width = 76
     $lblThreshold.Height = 32
     $lblThreshold.Margin = New-Object System.Windows.Forms.Padding(8, 4, 0, 4)
     [void]$top.Controls.Add($lblThreshold)
@@ -3331,7 +3374,7 @@ function Show-MainWindow {
     $chkFullDrive = New-Object System.Windows.Forms.CheckBox
     $chkFullDrive.Text = "扫描所有固定磁盘（较慢）"
     $chkFullDrive.Checked = $false
-    $chkFullDrive.Width = 205
+    $chkFullDrive.Width = 235
     $chkFullDrive.Height = 32
     $chkFullDrive.Margin = New-Object System.Windows.Forms.Padding(4, 4, 4, 4)
     [void]$top.Controls.Add($chkFullDrive)
@@ -3522,7 +3565,12 @@ function Show-MainWindow {
         if (-not $rowView) { return }
         $risk = if ($rowView.Row.Table.Columns.Contains("RiskRaw")) { [string]$rowView.Row["RiskRaw"] } else { "" }
         if (-not [string]::IsNullOrWhiteSpace($risk)) {
-            $grid.Rows[$_.RowIndex].DefaultCellStyle.ForeColor = Get-RiskColor $risk
+            $grid.Rows[$_.RowIndex].DefaultCellStyle.ForeColor = [System.Drawing.Color]::FromArgb(15, 23, 42)
+            if ($grid.Columns["Risk"]) {
+                $riskCell = $grid.Rows[$_.RowIndex].Cells["Risk"]
+                $riskCell.Style.ForeColor = Get-RiskColor $risk
+                $riskCell.Style.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9, [System.Drawing.FontStyle]::Bold)
+            }
         }
     }
     $groupGrid.Add_CellFormatting($riskColorFormatter)
@@ -3538,6 +3586,10 @@ function Show-MainWindow {
             $script:FullDriveLargeScan = $chkFullDrive.Checked
             Invoke-Scan
             & $refreshGroups
+        }
+        catch {
+            Set-Status ("界面刷新或扫描失败: {0}" -f $_.Exception.Message) -Busy:$false
+            [System.Windows.Forms.MessageBox]::Show(("扫描或刷新界面失败：`r`n{0}" -f $_.Exception.Message), "错误", "OK", "Error") | Out-Null
         }
         finally {
             $btnScan.Enabled = $true
